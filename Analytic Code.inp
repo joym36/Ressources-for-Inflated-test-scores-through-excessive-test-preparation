@@ -1,0 +1,156 @@
+DATA: FILE IS ...\Data.dat;
+
+VARIABLE:   NAMES ARE
+	    !Cluster variable English Class 
+            EClass 
+            !TTT variables
+            repex1 repex2 repex3 repex4 
+            strat1 strat2 strat3 strat4 
+            refT1 refT2 refT3 
+            mat1 mat2 mat3 mat4 
+            !Value variables
+            intrm1 intrm2 intrm3 
+            util1 util2 util3 
+            !Expectancy 
+            ASCd1 ASCd2 ASCd3 ASCd4 
+            !Test anxiety
+            anxie1 anxie2 anxie3 anxie4 
+            !Achievement in the sRDP
+            recept product MScore 
+            !Demographics
+            sex ageY EL2 eduB 
+            !Baseline control variables
+            ASC1c INTR1c UTIL1c TMark1 CRMark1 
+            !Parcelled TTT
+            Par1_1 Par1_2 Par1_3;
+
+            
+            USEVARIABLES ARE
+            Par1_1 Par1_2 Par1_3         
+            intrm1 intrm2 intrm3 
+            util1 util2 util3 
+            ASCd1 ASCd2 ASCd3 ASCd4 
+            anxie1 anxie2 anxie3 anxie4                         
+            MScore      
+            sex ASC1c INTR1c UTIL1c CRMark1;
+
+
+            WITHIN ARE
+            Par1_1 Par1_2 Par1_3         
+            intrm1 intrm2 intrm3 
+            util1 util2 util3 
+            ASCd1 ASCd2 ASCd3 ASCd4 
+            anxie1 anxie2 anxie3 anxie4                         
+            MScore      
+            sex ASC1c INTR1c UTIL1c CRMark1;
+
+
+            MISSING IS ALL(-99);
+            MISSING IS sex(2,3);
+
+            CLUSTER IS EClass;
+
+
+DEFINE:     !Center all variables
+            CENTER Par1_1 Par1_2 Par1_3        
+                   intrm1 intrm2 intrm3 
+                   util1 util2 util3 
+                   ASCd1 ASCd2 ASCd3 ASCd4 
+                   anxie1 anxie2 anxie3 anxie4                         
+                   MScore (GROUPMEAN);
+
+
+ANALYSIS:   TYPE = TWOLEVEL;
+            ESTIMATOR = BAYES;
+            BITERATIONS = 100000 (10000);
+    	    BCONVERGENCE = 0.002;
+            CHAINS = 8;
+            PROCESSORS = 4;
+MODEL:      
+
+    %WITHIN%
+
+! Measurement model
+
+            TTT   BY Par1_1 Par1_2 Par1_3;
+            INTR  BY intrm1 intrm2 intrm3 ;
+            UTIL  BY util1 util2 util3;
+            ASC   BY ASCd1 ASCd2 ASCd3 ASCd4;
+            ANX   BY anxie1 anxie2 anxie3 anxie4;
+            
+
+            !Fix intercepts at 0 (they are 0 by definition because of the centring!)
+            [Par1_1@0 Par1_2@0 Par1_3@0 
+             intrm1@0 intrm2@0 intrm3@0 
+             util1@0 util2@0 util3@0 
+             ASCd1@0 ASCd2@0 ASCd3@0 ASCd4@0
+             anxie1@0 anxie2@0 anxie3@0 anxie4@0
+             MScore@0];
+
+            !Define intercepts that should be estimated
+            [INTR UTIL ASC ANX MScore];
+
+
+            ! Covariates (control for gender and baseline levels)
+            ANX MScore ON sex;
+
+            INTR ON INTR1c;  !Control for baseline intrinsic motivation at T1
+            UTIL ON UTIL1c;  !Control for baseline utility value at T1
+            ASC  ON ASC1c;   !Control for baseline self-concept at T1
+            ANX MScore ON CRMark1; !Control for prior achievement (class report)
+
+
+! Structural Model
+
+           ! Direct effect of TTT on achievement           
+           MScore ON TTT (cdash); 
+
+           
+           ! Effects of TTT on mediator variables
+           INTR ON TTT (a1);
+           UTIL ON TTT (a2);
+           ASC  ON TTT (a3);
+           ANX  ON TTT (a4);
+
+         
+           ! Mediator effects on achievement
+           MScore ON INTR (b1);
+           MScore ON UTIL (b2); 
+           MScore ON ASC  (b3); 
+           MScore ON ANX  (b4); 
+
+
+    !Correlating the mediatiors
+    INTR WITH UTIL ASC ANX;
+    UTIL WITH ASC ANX;
+    ASC WITH ANX;
+
+
+    %BETWEEN%
+
+
+
+! Calculate indirect effects
+
+MODEL CONSTRAINT: 
+
+    NEW(TTT_I_SC, TTT_U_SC, TTT_A_SC, TTT_X_SC
+        T_IND, TOTAL);
+            
+    !Indirect effects
+    TTT_I_SC = a1*b1; !via intr. mot
+    TTT_U_SC = a2*b2; !via utility
+    TTT_A_SC = a3*b3; !via self-concept
+    TTT_X_SC = a4*b4; !via anxiety
+
+    !Total indirect effect
+    T_IND = a1*b1 + a2*b2 + a3*b3 + a4*b4;
+    
+    !Total effect
+    TOTAL = T_IND + cdash;
+
+
+
+PLOT: TYPE = PLOT2 PLOT3;
+
+OUTPUT:     STDYX CINTERVAL; 
